@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "db:reset": "node -e \"const db=require('better-sqlite3')('./teamsync.db');['comments','activity','standups','tasks'].forEach(t=>{db.prepare('DELETE FROM '+t).run();console.log('cleared:',t)});console.log('✅ DB reset done')\"",
+    "db:cli": "node dbcli.js"
   },
   "dependencies": {
     "better-sqlite3": "^9.4.3",

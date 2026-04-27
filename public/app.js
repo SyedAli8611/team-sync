@@ -58,7 +58,7 @@ function statusBadge(s) {
 
 function timeAgo(dateStr) {
   const now  = new Date();
-  const then = new Date(dateStr);
+  const then = new Date(dateStr.replace(' ', 'T') + 'Z');
   const diff = Math.floor((now - then) / 1000);
   if (diff < 60)     return 'just now';
   if (diff < 3600)   return `${Math.floor(diff/60)}m ago`;
