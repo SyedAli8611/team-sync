@@ -1,0 +1,7 @@
+teamsync.db
+teamsync.db-shm
+teamsync.db-wal
+node_modules/
+.env
+*.log
+test.py

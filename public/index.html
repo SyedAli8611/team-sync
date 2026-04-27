@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TeamSync — Work Better Together</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.css" />
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+
+<!-- ── LOGIN ────────────────────────────────────────────────────── -->
+<div id="login-page" class="login-page hidden">
+  <div class="login-bg">
+    <div class="login-orb orb1"></div>
+    <div class="login-orb orb2"></div>
+    <div class="login-orb orb3"></div>
+  </div>
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+      </div>
+      <span>TeamSync</span>
+    </div>
+    <h1 class="login-title">Welcome back</h1>
+    <p class="login-sub">Your team is waiting for you</p>
+    <form id="login-form" class="login-form">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="login-username" placeholder="e.g. faizan" autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="password123" autocomplete="current-password" />
+      </div>
+      <div id="login-error" class="login-error hidden"></div>
+      <button type="submit" class="btn btn-primary btn-full">
+        <span>Sign In</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+    </form>
+    <p class="login-hint">Use your first name as username · Password: password123</p>
+  </div>
+</div>
+
+<!-- ── APP SHELL ─────────────────────────────────────────────────── -->
+<div id="app" class="app hidden">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+      </div>
+      <span class="logo-text">TeamSync</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#dashboard" class="nav-item" data-view="dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </a>
+      <a href="#board" class="nav-item" data-view="board">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>
+        <span>Board</span>
+      </a>
+      <a href="#mytasks" class="nav-item" data-view="mytasks">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        <span>My Tasks</span>
+      </a>
+      <a href="#standup" class="nav-item" data-view="standup">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span>Standup</span>
+        <span id="standup-dot" class="nav-dot hidden"></span>
+      </a>
+      <a href="#team" class="nav-item" data-view="team">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        <span>Team</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-projects" id="sidebar-projects">
+      <div class="sidebar-section-title">Projects</div>
+      <div id="project-list-sidebar"></div>
+      <button class="btn-new-project" id="btn-new-project">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Project
+      </button>
+    </div>
+
+    <div class="sidebar-user" id="sidebar-user">
+      <div class="user-avatar" id="sidebar-avatar" style="cursor:pointer">?</div>
+      <div class="user-info" style="cursor:pointer">
+        <div class="user-name" id="sidebar-name">Loading...</div>
+        <div class="user-role" id="sidebar-role">Member</div>
+      </div>
+      <button class="logout-btn" id="logout-btn" title="Sign out">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Area -->
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2 id="page-title">Dashboard</h2>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-primary" id="btn-create-task">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Task
+        </button>
+        <div class="topbar-date" id="topbar-date"></div>
+      </div>
+    </header>
+
+    <div id="main-content" class="main-content"></div>
+  </main>
+</div>
+
+<!-- ── TASK MODAL ────────────────────────────────────────────────── -->
+<div id="task-modal" class="modal-overlay hidden">
+  <div class="modal modal-large">
+    <div class="modal-header">
+      <div class="modal-title-row">
+        <span id="modal-project-badge" class="project-badge"></span>
+        <h3 id="modal-title">Task Details</h3>
+      </div>
+      <button class="modal-close" id="modal-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- ── CREATE TASK MODAL ─────────────────────────────────────────── -->
+<div id="create-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Create New Task</h3>
+      <button class="modal-close" id="create-modal-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="create-task-form">
+        <div class="form-group">
+          <label>Title *</label>
+          <input type="text" id="ct-title" placeholder="What needs to be done?" required />
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="ct-description" placeholder="Add more details..." rows="3"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Assignee</label>
+            <select id="ct-assignee">
+              <option value="">Unassigned</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Project</label>
+            <select id="ct-project">
+              <option value="">No Project</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Priority</label>
+            <select id="ct-priority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="ct-status">
+              <option value="todo">To Do</option>
+              <option value="inprogress">In Progress</option>
+              <option value="review">In Review</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Due Date</label>
+            <input type="date" id="ct-due-date" />
+          </div>
+          <div class="form-group">
+            <label>Story Points</label>
+            <input type="number" id="ct-points" min="0" max="100" value="0" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" id="create-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── PROJECT MODAL ─────────────────────────────────────────────── -->
+<div id="project-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>New Project</h3>
+      <button class="modal-close" id="project-modal-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="create-project-form">
+        <div class="form-group">
+          <label>Project Name *</label>
+          <input type="text" id="p-name" placeholder="e.g. Mobile App v2.0" required />
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="p-desc" placeholder="What is this project about?" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <div class="color-picker" id="color-picker">
+            <div class="color-swatch selected" data-color="#6366F1" style="background:#6366F1"></div>
+            <div class="color-swatch" data-color="#EC4899" style="background:#EC4899"></div>
+            <div class="color-swatch" data-color="#14B8A6" style="background:#14B8A6"></div>
+            <div class="color-swatch" data-color="#F59E0B" style="background:#F59E0B"></div>
+            <div class="color-swatch" data-color="#10B981" style="background:#10B981"></div>
+            <div class="color-swatch" data-color="#F97316" style="background:#F97316"></div>
+            <div class="color-swatch" data-color="#06B6D4" style="background:#06B6D4"></div>
+            <div class="color-swatch" data-color="#EF4444" style="background:#EF4444"></div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" id="project-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── CHANGE PASSWORD MODAL ──────────────────────────────────────── -->
+<div id="change-pwd-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Change Password</h3>
+      <button class="modal-close" id="change-pwd-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="change-pwd-form">
+        <div class="form-group">
+          <label>Current Password</label>
+          <input type="password" id="cp-current" placeholder="Your current password" required />
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="cp-new" placeholder="At least 6 characters" required />
+        </div>
+        <div class="form-group">
+          <label>Confirm New Password</label>
+          <input type="password" id="cp-confirm" placeholder="Repeat new password" required />
+        </div>
+        <div id="cp-error" class="login-error hidden"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" id="cp-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADMIN: RESET MEMBER PASSWORD MODAL ────────────────────────── -->
+<div id="admin-reset-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Admin — Reset Password
+      </h3>
+      <button class="modal-close" id="admin-reset-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:4px">Set a new password for any team member. Share it with them privately — they can change it after logging in.</p>
+      <form id="admin-reset-form">
+        <div class="form-group">
+          <label>Team Member</label>
+          <select id="ar-user" required></select>
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="text" id="ar-password" placeholder="e.g. Welcome@123" required />
+          <span style="font-size:11px;color:var(--text-faint)">Tip: share this with the member so they can log in</span>
+        </div>
+        <div id="ar-error" class="login-error hidden"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" id="ar-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary">Reset Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── PROFILE MENU (fixed, body-level to avoid sidebar overflow clipping) -->
+<div id="profile-menu" class="profile-menu hidden">
+  <button class="profile-menu-item" id="pm-change-pwd">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    Change Password
+  </button>
+  <button class="profile-menu-item admin-only hidden" id="pm-reset-pwd">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
+    Reset Member Password
+  </button>
+  <div class="profile-menu-divider"></div>
+  <button class="profile-menu-item danger" id="pm-logout">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    Sign Out
+  </button>
+</div>
+
+<!-- ── TOAST ─────────────────────────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
