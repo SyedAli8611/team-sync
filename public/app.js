@@ -12,6 +12,8 @@ const state = {
   boardFilters: { project_id: '', assignee_id: '', priority: '' },
   selectedProjectColor: '#6366F1',
   openTaskId: null,
+  historyDate:  new Date().toISOString().split('T')[0],
+  historyMonth: { year: new Date().getFullYear(), month: new Date().getMonth() + 1 },
 };
 
 // ── SOCKET ─────────────────────────────────────────────
@@ -105,7 +107,7 @@ function navigate(view) {
   document.querySelectorAll('.nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.view === view);
   });
-  const titles = { dashboard: 'Dashboard', board: 'Kanban Board', mytasks: 'My Tasks', standup: 'Daily Standup', team: 'Our Team' };
+  const titles = { dashboard: 'Dashboard', board: 'Kanban Board', mytasks: 'My Tasks', standup: 'Daily Standup', team: 'Our Team', history: 'Activity History' };
   document.getElementById('page-title').textContent = titles[view] || 'TeamSync';
   renderView(view);
 }
@@ -120,6 +122,7 @@ async function renderView(view) {
       case 'mytasks':   await renderMyTasks();   break;
       case 'standup':   await renderStandup();   break;
       case 'team':      await renderTeam();      break;
+      case 'history':   await renderHistory();   break;
     }
   } catch(e) {
     content.innerHTML = `<div class="empty-state"><h3>Error loading page</h3><p>${e.message}</p></div>`;
@@ -1085,6 +1088,177 @@ document.getElementById('pm-logout').addEventListener('click', async () => {
   profileMenu.classList.add('hidden');
   showLogin();
 });
+
+// ── HISTORY ───────────────────────────────────────────────
+async function renderHistory() {
+  const content = document.getElementById('main-content');
+  const { year, month } = state.historyMonth;
+
+  const [activeDates, detail] = await Promise.all([
+    api.get(`/api/history/active-dates?year=${year}&month=${month}`),
+    api.get(`/api/history?date=${state.historyDate}`),
+  ]);
+
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const today  = new Date().toISOString().split('T')[0];
+
+  const firstWeekday  = new Date(year, month - 1, 1).getDay();
+  const daysInMonth   = new Date(year, month, 0).getDate();
+  const daysInPrevMo  = new Date(year, month - 1, 0).getDate();
+  const totalCells    = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
+
+  let calCells = '';
+  for (let i = firstWeekday - 1; i >= 0; i--) {
+    calCells += `<div class="cal-day other-month">${daysInPrevMo - i}</div>`;
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds  = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const cls = [
+      'cal-day',
+      ds === today           ? 'today'        : '',
+      ds === state.historyDate ? 'selected'   : '',
+      activeDates.includes(ds) ? 'has-activity' : '',
+    ].filter(Boolean).join(' ');
+    calCells += `<div class="${cls}" data-date="${ds}" onclick="selectHistoryDate('${ds}')">
+      ${d}${activeDates.includes(ds) ? '<span class="cal-dot"></span>' : ''}
+    </div>`;
+  }
+  const trailing = totalCells - firstWeekday - daysInMonth;
+  for (let d = 1; d <= trailing; d++) {
+    calCells += `<div class="cal-day other-month">${d}</div>`;
+  }
+
+  const selDateLabel = new Date(state.historyDate + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+
+  content.innerHTML = `
+  <div class="history-layout">
+    <div class="history-calendar-panel">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" id="cal-prev">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="cal-month-title">${MONTHS[month - 1]} ${year}</span>
+        <button class="cal-nav-btn" id="cal-next">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+      <div class="cal-weekdays">${DAYS.map(d => `<div class="cal-weekday">${d}</div>`).join('')}</div>
+      <div class="cal-grid">${calCells}</div>
+      <div class="cal-legend">
+        <span class="cal-dot-inline"></span>
+        <span>Days with activity</span>
+      </div>
+    </div>
+
+    <div class="history-detail-panel">
+      <div class="history-detail-header">
+        <h3 class="history-detail-date">${selDateLabel}</h3>
+        <span class="history-detail-summary">${detail.activities.length} activities &middot; ${detail.standups.length} standups</span>
+      </div>
+      ${buildHistoryDetail(detail)}
+    </div>
+  </div>`;
+
+  document.getElementById('cal-prev').addEventListener('click', () => {
+    let { year, month } = state.historyMonth;
+    month--; if (month < 1) { month = 12; year--; }
+    state.historyMonth = { year, month };
+    renderHistory();
+  });
+  document.getElementById('cal-next').addEventListener('click', () => {
+    let { year, month } = state.historyMonth;
+    month++; if (month > 12) { month = 1; year++; }
+    state.historyMonth = { year, month };
+    renderHistory();
+  });
+}
+
+function buildHistoryDetail({ activities, standups }) {
+  if (!activities.length && !standups.length) {
+    return `<div class="history-empty">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <p>No activity on this day</p>
+    </div>`;
+  }
+
+  let html = '';
+
+  if (standups.length) {
+    html += `<div class="history-section">
+      <div class="history-section-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Standups (${standups.length})
+      </div>
+      <div class="history-standups">
+        ${standups.map(s => `
+        <div class="history-standup-card">
+          <div class="history-standup-header">
+            ${avatar(s.user_name, s.avatar_color || '#6E54E8', 'sm')}
+            <div>
+              <div class="history-standup-name">${s.user_name}</div>
+              <div class="history-standup-meta">${s.job_title || 'Team Member'} &middot; ${moodEmoji(s.mood)} ${s.mood}</div>
+            </div>
+          </div>
+          ${s.did_today ? `<div class="history-standup-field"><span class="history-standup-label">Did</span><p>${s.did_today}</p></div>` : ''}
+          ${s.will_do   ? `<div class="history-standup-field"><span class="history-standup-label">Will do</span><p>${s.will_do}</p></div>` : ''}
+          ${s.blockers  ? `<div class="history-standup-field"><span class="history-standup-label">Blockers</span><p>${s.blockers}</p></div>` : ''}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (activities.length) {
+    html += `<div class="history-section">
+      <div class="history-section-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Activity (${activities.length})
+      </div>
+      <div class="history-timeline">
+        ${activities.map(a => `
+        <div class="timeline-item">
+          <div class="timeline-dot action-${a.action}"></div>
+          <div class="timeline-content">
+            ${avatar(a.user_name, a.avatar_color || '#6E54E8', 'sm')}
+            <div class="timeline-text">
+              <strong>${a.user_name}</strong> ${a.details}
+              ${a.task_title ? `<span class="task-link" onclick="openTask(${a.task_id})">"${a.task_title}"</span>` : ''}
+            </div>
+            <div class="timeline-time">${historyTime(a.created_at)}</div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  return html;
+}
+
+function historyTime(dateStr) {
+  return new Date(dateStr.replace(' ', 'T') + 'Z').toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+async function selectHistoryDate(dateStr) {
+  state.historyDate = dateStr;
+  document.querySelectorAll('.cal-day[data-date]').forEach(el => {
+    el.classList.toggle('selected', el.dataset.date === dateStr);
+  });
+  const detail = await api.get(`/api/history?date=${dateStr}`);
+  const selDateLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+  const panel = document.querySelector('.history-detail-panel');
+  if (panel) {
+    panel.innerHTML = `
+      <div class="history-detail-header">
+        <h3 class="history-detail-date">${selDateLabel}</h3>
+        <span class="history-detail-summary">${detail.activities.length} activities &middot; ${detail.standups.length} standups</span>
+      </div>
+      ${buildHistoryDetail(detail)}`;
+  }
+}
 
 // ── BOOT ──────────────────────────────────────────────────
 init();

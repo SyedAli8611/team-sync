@@ -287,6 +287,48 @@ router.get('/activity', auth, (req, res) => {
   res.json(rows);
 });
 
+// ── HISTORY ───────────────────────────────────────────────────────────────────
+router.get('/history/active-dates', auth, (req, res) => {
+  const db = getDB();
+  const { year, month } = req.query;
+  const prefix = `${year}-${String(parseInt(month)).padStart(2, '0')}`;
+
+  const actDates = db.prepare(
+    `SELECT DISTINCT DATE(created_at) AS d FROM activity WHERE DATE(created_at) LIKE ?`
+  ).all(`${prefix}%`).map(r => r.d);
+
+  const stdDates = db.prepare(
+    `SELECT DISTINCT date AS d FROM standups WHERE date LIKE ?`
+  ).all(`${prefix}%`).map(r => r.d);
+
+  res.json([...new Set([...actDates, ...stdDates])]);
+});
+
+router.get('/history', auth, (req, res) => {
+  const db   = getDB();
+  const date = req.query.date || new Date().toISOString().split('T')[0];
+
+  const activities = db.prepare(`
+    SELECT a.*, u.name AS user_name, u.avatar_color, u.username,
+           t.title AS task_title
+    FROM activity a
+    JOIN users u ON a.user_id = u.id
+    LEFT JOIN tasks t ON a.task_id = t.id
+    WHERE DATE(a.created_at) = ?
+    ORDER BY a.created_at DESC
+  `).all(date);
+
+  const standups = db.prepare(`
+    SELECT s.*, u.name AS user_name, u.avatar_color, u.username, u.job_title
+    FROM standups s
+    JOIN users u ON s.user_id = u.id
+    WHERE s.date = ?
+    ORDER BY s.submitted_at ASC
+  `).all(date);
+
+  res.json({ activities, standups });
+});
+
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 router.get('/dashboard', auth, (req, res) => {
   const db   = getDB();
