@@ -12,6 +12,7 @@ const state = {
   boardFilters: { project_id: '', assignee_id: '', priority: '' },
   selectedProjectColor: '#6366F1',
   openTaskId: null,
+  editingTaskId: null,
   historyDate:  new Date().toISOString().split('T')[0],
   historyMonth: { year: new Date().getFullYear(), month: new Date().getMonth() + 1 },
 };
@@ -791,11 +792,34 @@ async function deleteTask(id) {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
-function openEditTask(id) {
-  const task = null; // fetch and populate create modal for editing
-  document.querySelector('.modal-overlay:not(.hidden) #modal-title').textContent = 'Edit Task';
-  // For now open create modal pre-filled
-  showToast('Edit via the Create Task modal — fill in updated values', 'info');
+async function openEditTask(id) {
+  if (state.users.length === 0)    state.users    = await api.get('/api/users');
+  if (state.projects.length === 0) state.projects = await api.get('/api/projects');
+
+  const task = await api.get(`/api/tasks/${id}`);
+  state.editingTaskId = id;
+
+  const assigneeEl = document.getElementById('ct-assignee');
+  const projectEl  = document.getElementById('ct-project');
+
+  assigneeEl.innerHTML = '<option value="">Unassigned</option>' +
+    state.users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+  projectEl.innerHTML  = '<option value="">No Project</option>' +
+    state.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+  document.getElementById('ct-title').value       = task.title;
+  document.getElementById('ct-description').value = task.description || '';
+  document.getElementById('ct-priority').value    = task.priority;
+  document.getElementById('ct-status').value      = task.status;
+  document.getElementById('ct-due-date').value    = task.due_date || '';
+  document.getElementById('ct-points').value      = task.story_points || 0;
+  if (task.assignee_id) assigneeEl.value = String(task.assignee_id);
+  if (task.project_id)  projectEl.value  = String(task.project_id);
+
+  document.querySelector('#create-modal h3').textContent                    = 'Edit Task';
+  document.querySelector('#create-task-form [type="submit"]').textContent   = 'Save Changes';
+
+  document.getElementById('create-modal').classList.remove('hidden');
 }
 
 // ── CREATE TASK MODAL ───────────────────────────────────
@@ -845,6 +869,11 @@ function filterByProject(id) {
 function closeModal(id) {
   document.getElementById(id).classList.add('hidden');
   if (id === 'task-modal') state.openTaskId = null;
+  if (id === 'create-modal' && state.editingTaskId) {
+    state.editingTaskId = null;
+    document.querySelector('#create-modal h3').textContent                  = 'Create New Task';
+    document.querySelector('#create-task-form [type="submit"]').textContent = 'Create Task';
+  }
 }
 
 // ── CHECK STANDUP DOT ───────────────────────────────────
@@ -957,9 +986,17 @@ document.getElementById('create-task-form').addEventListener('submit', async (e)
     story_points: parseInt(document.getElementById('ct-points').value) || 0,
   };
   try {
-    await api.post('/api/tasks', data);
-    closeModal('create-modal');
-    showToast('Task created!', 'success');
+    if (state.editingTaskId) {
+      const taskId = state.editingTaskId;
+      await api.put(`/api/tasks/${taskId}`, data);
+      closeModal('create-modal');
+      showToast('Task updated!', 'success');
+      openTask(taskId);
+    } else {
+      await api.post('/api/tasks', data);
+      closeModal('create-modal');
+      showToast('Task created!', 'success');
+    }
     if (state.currentView === 'board' || state.currentView === 'mytasks') renderView(state.currentView);
     loadSidebarProjects();
   } catch(err) { showToast(err.message, 'error'); }

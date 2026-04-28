@@ -93,6 +93,15 @@ function initDB() {
     );
   `);
 
+  // migrate: add email column if it doesn't exist yet
+  const cols = database.prepare("PRAGMA table_info(users)").all();
+  if (!cols.find(c => c.name === 'email')) {
+    database.exec("ALTER TABLE users ADD COLUMN email TEXT");
+  }
+
+  // set test email for faizan
+  database.prepare("UPDATE users SET email='asyedfaizana@gmail.com' WHERE username='faizan' AND (email IS NULL OR email='')").run();
+
   const userCount = database.prepare('SELECT COUNT(*) as count FROM users').get();
 
   if (userCount.count === 0) {

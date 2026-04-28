@@ -1,6 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const { getDB } = require('../db');
+const { sendTaskAssigned, sendTaskDone } = require('../mailer');
 
 function auth(req, res, next) {
   if (!req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
@@ -124,6 +125,22 @@ router.post('/tasks', auth, (req, res) => {
     req.session.userId, task.id, 'created', `created task "${title}"`
   );
 
+  // email assignee if different from creator and has an email
+  if (assignee_id && parseInt(assignee_id) !== req.session.userId) {
+    const assigneeUser = db.prepare('SELECT name, email FROM users WHERE id = ?').get(assignee_id);
+    const creator      = db.prepare('SELECT name FROM users WHERE id = ?').get(req.session.userId);
+    if (assigneeUser?.email) {
+      sendTaskAssigned({
+        to:           assigneeUser.email,
+        assigneeName: assigneeUser.name,
+        taskTitle:    title,
+        projectName:  task.project_name,
+        createdBy:    creator?.name || 'A team member',
+        priority:     task.priority,
+      }).catch(() => {});
+    }
+  }
+
   req.io.emit('task:created', task);
   res.status(201).json(task);
 });
@@ -168,6 +185,17 @@ router.put('/tasks/:id', auth, (req, res) => {
     db.prepare('INSERT INTO activity (user_id, task_id, action, details) VALUES (?, ?, ?, ?)').run(
       req.session.userId, updated.id, 'moved', `moved to ${status}`
     );
+    // email whole team when task is marked done
+    if (status === 'done') {
+      const resolver   = db.prepare('SELECT name FROM users WHERE id = ?').get(req.session.userId);
+      const allEmails  = db.prepare('SELECT email FROM users WHERE email IS NOT NULL AND email != ""').all().map(r => r.email);
+      sendTaskDone({
+        recipients:  allEmails,
+        taskTitle:   updated.title,
+        projectName: updated.project_name,
+        resolvedBy:  resolver?.name || 'A team member',
+      }).catch(() => {});
+    }
   } else {
     db.prepare('INSERT INTO activity (user_id, task_id, action, details) VALUES (?, ?, ?, ?)').run(
       req.session.userId, updated.id, 'updated', `updated task details`
