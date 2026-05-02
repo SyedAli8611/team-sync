@@ -634,6 +634,36 @@ input, textarea, select { font-family: inherit; }
 }
 .comment-input:focus { outline: none; border-color: var(--primary); }
 
+/* Attachments */
+.attachments-section { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border-soft); }
+
+.attachment-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+
+.attachment-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 8px 10px;
+  transition: border-color 0.15s;
+}
+.attachment-item:hover { border-color: var(--primary); }
+
+.attachment-info { flex: 1; min-width: 0; }
+.attachment-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.attachment-meta { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+
+.attachment-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.attachment-btn { opacity: 0.6; transition: opacity 0.15s; }
+.attachment-item:hover .attachment-btn { opacity: 1; }
+
+.attach-trigger-btn {
+  width: 100%; justify-content: center; gap: 6px;
+  border: 1px dashed var(--border) !important;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  transition: border-color 0.15s, color 0.15s;
+}
+.attach-trigger-btn:hover { border-color: var(--primary) !important; color: var(--primary); }
+
 /* ═══════════════════════════════════════════════════════
    MY TASKS
 ═══════════════════════════════════════════════════════ */

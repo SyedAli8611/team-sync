@@ -102,6 +102,87 @@ function showToast(msg, type = 'success') {
   setTimeout(() => el.remove(), 3500);
 }
 
+function escapeHtml(text) {
+  return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return '—';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function fileTypeIcon(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase().slice(0, 4);
+  const palette = { pdf: '#F85149', doc: '#58A6FF', docx: '#58A6FF', xls: '#3FB950', xlsx: '#3FB950',
+                    ppt: '#F97316', pptx: '#F97316', txt: '#8B949E', zip: '#D29922',
+                    png: '#EC4899', jpg: '#EC4899', jpeg: '#EC4899', gif: '#EC4899', mp4: '#6E54E8' };
+  const bg = palette[ext] || '#6E54E8';
+  return `<div style="width:34px;height:38px;background:${bg}20;border:1px solid ${bg}50;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:${bg};text-transform:uppercase;letter-spacing:0;flex-shrink:0">${ext||'file'}</div>`;
+}
+
+function buildAttachmentsHTML(attachments, taskId) {
+  if (!attachments.length) return '<div style="color:var(--text-faint);font-size:13px;font-style:italic;padding:6px 0">No attachments yet</div>';
+  return attachments.map(a => `
+  <div class="attachment-item" id="attachment-row-${a.id}">
+    ${fileTypeIcon(a.original_name)}
+    <div class="attachment-info">
+      <div class="attachment-name">${escapeHtml(a.original_name)}</div>
+      <div class="attachment-meta">${formatFileSize(a.file_size)} &middot; ${escapeHtml(a.uploader_name)} &middot; ${timeAgo(a.uploaded_at)}</div>
+    </div>
+    <div class="attachment-actions">
+      <a href="/api/attachments/file/${a.id}" class="btn btn-ghost btn-sm attachment-btn" title="Download" style="padding:5px 8px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </a>
+      ${(a.uploaded_by === state.user.id || state.user.role === 'admin') ? `
+      <button class="btn btn-ghost btn-sm attachment-btn" onclick="deleteAttachment(${a.id},${taskId})" title="Delete" style="padding:5px 8px;color:var(--danger)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+      </button>` : ''}
+    </div>
+  </div>`).join('');
+}
+
+async function renderAttachments(taskId) {
+  try {
+    const attachments = await api.get(`/api/attachments/${taskId}`);
+    const listEl  = document.getElementById(`attachment-list-${taskId}`);
+    const countEl = document.getElementById(`attach-count-${taskId}`);
+    if (listEl)  listEl.innerHTML  = buildAttachmentsHTML(attachments, taskId);
+    if (countEl) countEl.textContent = `(${attachments.length})`;
+  } catch(e) {}
+}
+
+async function uploadAttachments(taskId, input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  for (const file of files) {
+    try {
+      const fd  = new FormData();
+      fd.append('file', file);
+      const res  = await fetch(`/api/attachments/${taskId}`, { method: 'POST', credentials: 'include', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      showToast(`"${escapeHtml(file.name)}" attached`, 'success');
+    } catch(e) {
+      showToast(`Failed: ${e.message}`, 'error');
+    }
+  }
+  input.value = '';
+  await renderAttachments(taskId);
+}
+
+async function deleteAttachment(attachmentId, taskId) {
+  if (!confirm('Delete this attachment? This cannot be undone.')) return;
+  try {
+    await api.delete(`/api/attachments/${attachmentId}`);
+    showToast('Attachment deleted', 'success');
+    await renderAttachments(taskId);
+  } catch(e) {
+    showToast(e.message, 'error');
+  }
+}
+
 // ── ROUTER ──────────────────────────────────────────────
 function navigate(view) {
   state.currentView = view;
@@ -658,7 +739,11 @@ async function openTask(id) {
   modal.classList.remove('hidden');
 
   try {
-    const [task, comments] = await Promise.all([api.get(`/api/tasks/${id}`), api.get(`/api/comments/${id}`)]);
+    const [task, comments, attachments] = await Promise.all([
+      api.get(`/api/tasks/${id}`),
+      api.get(`/api/comments/${id}`),
+      api.get(`/api/attachments/${id}`)
+    ]);
 
     document.getElementById('modal-project-badge').textContent = task.project_key || task.project_name || '';
     document.getElementById('modal-project-badge').style.cssText = task.project_color ? `display:inline-flex;background:${task.project_color}22;color:${task.project_color}` : 'display:none';
@@ -670,6 +755,22 @@ async function openTask(id) {
         <div style="margin-bottom:16px">
           <div class="detail-section-title">Description</div>
           <div class="task-description" id="task-desc-${id}">${task.description || '<span style="color:var(--text-faint);font-style:italic">No description</span>'}</div>
+        </div>
+
+        <div class="attachments-section">
+          <div class="detail-section-title">Attachments <span id="attach-count-${id}" style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--text-muted)">(${attachments.length})</span></div>
+          <div id="attachment-list-${id}" class="attachment-list">
+            ${buildAttachmentsHTML(attachments, id)}
+          </div>
+          <div style="margin-top:8px">
+            <input type="file" id="attach-input-${id}" style="display:none" multiple
+                   accept=".pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.txt,.zip,.mp4,.pptx,.ppt"
+                   onchange="uploadAttachments(${id}, this)">
+            <button class="btn btn-ghost btn-sm attach-trigger-btn" onclick="document.getElementById('attach-input-${id}').click()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Attach File
+            </button>
+          </div>
         </div>
 
         <div class="comments-section">
