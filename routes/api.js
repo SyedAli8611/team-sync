@@ -2,6 +2,31 @@ const express = require('express');
 const router  = express.Router();
 const { getDB } = require('../db');
 const { sendTaskAssigned, sendTaskDone } = require('../mailer');
+const multer  = require('multer');
+const fs      = require('fs');
+const path    = require('path');
+
+const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `task-${req.params.taskId}-${Date.now()}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['.pdf','.png','.jpg','.jpeg','.gif','.doc','.docx',
+                     '.xls','.xlsx','.txt','.zip','.mp4','.pptx','.ppt'];
+    if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
+    else cb(new Error('File type not allowed'));
+  }
+});
 
 function auth(req, res, next) {
   if (!req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
@@ -188,7 +213,7 @@ router.put('/tasks/:id', auth, (req, res) => {
     // email whole team when task is marked done
     if (status === 'done') {
       const resolver   = db.prepare('SELECT name FROM users WHERE id = ?').get(req.session.userId);
-      const allEmails  = db.prepare('SELECT email FROM users WHERE email IS NOT NULL AND email != ""').all().map(r => r.email);
+      const allEmails  = db.prepare("SELECT email FROM users WHERE email IS NOT NULL AND email != ''").all().map(r => r.email);
       sendTaskDone({
         recipients:  allEmails,
         taskTitle:   updated.title,
@@ -394,6 +419,80 @@ router.get('/dashboard', auth, (req, res) => {
   `).all(today);
 
   res.json({ totalTasks, myTasks, inProgress, doneToday, standupsDone, totalMembers, myTasksList, recentActivity, teamStandups });
+});
+
+// ── ATTACHMENTS ───────────────────────────────────────────────────────────────
+
+router.get('/attachments/file/:id', auth, (req, res) => {
+  const db = getDB();
+  const attachment = db.prepare('SELECT * FROM task_attachments WHERE id = ?').get(req.params.id);
+  if (!attachment) return res.status(404).json({ error: 'Attachment not found' });
+
+  const filePath = path.join(UPLOADS_DIR, attachment.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' });
+
+  res.download(filePath, attachment.original_name);
+});
+
+router.get('/attachments/:taskId', auth, (req, res) => {
+  const db   = getDB();
+  const rows = db.prepare(`
+    SELECT a.*, u.name AS uploader_name, u.avatar_color
+    FROM task_attachments a
+    JOIN users u ON a.uploaded_by = u.id
+    WHERE a.task_id = ?
+    ORDER BY a.uploaded_at DESC
+  `).all(req.params.taskId);
+  res.json(rows);
+});
+
+router.post('/attachments/:taskId', auth, (req, res) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const db   = getDB();
+    const task = db.prepare('SELECT id FROM tasks WHERE id = ?').get(req.params.taskId);
+    if (!task) {
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const info = db.prepare(`
+      INSERT INTO task_attachments (task_id, filename, original_name, file_size, mime_type, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(req.params.taskId, req.file.filename, req.file.originalname,
+           req.file.size, req.file.mimetype, req.session.userId);
+
+    db.prepare('INSERT INTO activity (user_id, task_id, action, details) VALUES (?, ?, ?, ?)').run(
+      req.session.userId, req.params.taskId, 'attached', `attached file "${req.file.originalname}"`
+    );
+
+    const attachment = db.prepare(`
+      SELECT a.*, u.name AS uploader_name, u.avatar_color
+      FROM task_attachments a JOIN users u ON a.uploaded_by = u.id
+      WHERE a.id = ?
+    `).get(info.lastInsertRowid);
+
+    res.status(201).json(attachment);
+  });
+});
+
+router.delete('/attachments/:id', auth, (req, res) => {
+  const db         = getDB();
+  const attachment = db.prepare('SELECT * FROM task_attachments WHERE id = ?').get(req.params.id);
+  if (!attachment) return res.status(404).json({ error: 'Attachment not found' });
+
+  const user = db.prepare('SELECT role FROM users WHERE id = ?').get(req.session.userId);
+  if (attachment.uploaded_by !== req.session.userId && user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Not authorized to delete this attachment' });
+  }
+
+  const filePath = path.join(UPLOADS_DIR, attachment.filename);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+  db.prepare('DELETE FROM task_attachments WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
 });
 
 module.exports = router;
